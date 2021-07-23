@@ -79,7 +79,10 @@ class GrpcServer : public ServerInterface {
              Env* env);
   // Allow children classes to override this and provide custom args to the
   // server before it is constructed. Default behavior is to do nothing.
-  virtual void MaybeMutateBuilder(::grpc::ServerBuilder* builder);
+  // requested_port provides the port requested by caller as bound_port() is
+  // not available till BuildAndStart has been called.
+  virtual void MaybeMutateBuilder(::grpc::ServerBuilder* builder,
+                                  int requested_port) {}
 
  public:
   static Status Create(const ServerDef& server_def, Env* env,
@@ -110,6 +113,9 @@ class GrpcServer : public ServerInterface {
       const tensorflow::uint64 context_id, tensorflow::EagerContext* context);
   // Update the set of workers that can be reached by the GRPC server
   Status UpdateServerDef(const ServerDef& server_def);
+  // Pass coordination service agent instance to server's RPC handler
+  virtual Status SetCoordinationServiceAgentInstance(
+      CoordinationServiceAgent* agent);
 
  protected:
   virtual Status GetHostAndPort(const ServerDef& server_def, string* host_name,
@@ -139,6 +145,10 @@ class GrpcServer : public ServerInterface {
   virtual std::map<std::string, AsyncServiceInterface*> ExtraServices(
       ::grpc::ServerBuilder*) {
     return {};
+  }
+
+  virtual std::map<std::string, AsyncServiceInterface*> GetExtraServices() {
+    return extra_services_;
   }
 
   // Parses a WorkerCacheFactoryOptions into a GrpcChannelSpec.

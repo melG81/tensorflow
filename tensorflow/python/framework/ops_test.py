@@ -1546,6 +1546,25 @@ class NameStackTest(test_util.TensorFlowTestCase):
       with g.name_scope("_bar"):
         pass
 
+  def testEmptyScopeEdgeCases(self):
+    g = ops.Graph()
+    self.assertEqual("", g.get_name_scope())
+    with g.name_scope("") as scope:
+      self.assertEqual("", scope)
+      self.assertEqual("", g.get_name_scope())
+    with g.name_scope(None) as scope:
+      self.assertEqual("", scope)
+      self.assertEqual("", g.get_name_scope())
+    with g.name_scope("foo") as scope:
+      self.assertEqual("foo/", scope)
+      self.assertEqual("foo", g.get_name_scope())
+      with g.name_scope("") as scope:
+        self.assertEqual("", scope)
+        self.assertEqual("", g.get_name_scope())
+      with g.name_scope(None) as scope:
+        self.assertEqual("", scope)
+        self.assertEqual("", g.get_name_scope())
+
 
 class NameTest(test_util.TensorFlowTestCase):
 
@@ -2593,6 +2612,16 @@ class OpScopeTest(test_util.TensorFlowTestCase):
     with self.assertRaises(ValueError):
       with ops.name_scope(scope_name, values=graph_elements + [a]):
         pass
+
+  @test_util.run_in_graph_and_eager_modes
+  def testGetCurrentNameScope(self):
+    self.assertEqual(ops.get_current_name_scope(), "")
+    with ops.name_scope_v2("aaa"):
+      self.assertEqual(ops.get_current_name_scope(), "aaa")
+      with ops.name_scope_v2("bbb"):
+        self.assertEqual(ops.get_current_name_scope(), "aaa/bbb")
+      self.assertEqual(ops.get_current_name_scope(), "aaa")
+    self.assertEqual(ops.get_current_name_scope(), "")
 
   @test_util.run_deprecated_v1
   def testTensor(self):

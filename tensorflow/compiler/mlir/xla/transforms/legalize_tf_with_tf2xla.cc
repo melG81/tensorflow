@@ -39,6 +39,7 @@ limitations under the License.
 #include "mlir/Pass/Pass.h"  // from @llvm-project
 #include "mlir/Support/LogicalResult.h"  // from @llvm-project
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"  // from @llvm-project
+#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "tensorflow/compiler/mlir/op_or_arg_name_mapper.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
 #include "tensorflow/compiler/mlir/tensorflow/translate/export_tf_dialect_op.h"
@@ -144,7 +145,6 @@ bool IsOpAllowedTf2XlaFallback(Operation* op) {
     TypeID::get<TF::FakeQuantWithMinMaxVarsGradientOp>(),
     TypeID::get<TF::FloorDivOp>(),
     TypeID::get<TF::FloorModOp>(),
-    TypeID::get<TF::GatherNdOp>(),
     TypeID::get<TF::GreaterOp>(),
     TypeID::get<TF::HSVToRGBOp>(),
     TypeID::get<TF::IFFT2DOp>(),
@@ -385,7 +385,6 @@ bool IsOpAllowedTf2XlaPreferred(Operation* op) {
     TypeID::get<TF::XlaAllReduceOp>(),
     TypeID::get<TF::XlaGatherOp>(),
     TypeID::get<TF::XlaReplicaIdOp>(),
-    TypeID::get<TF::XlaShardingOp>(),
     TypeID::get<TF::Xlog1pyOp>(),
     TypeID::get<TF::ZerosLikeOp>(),
   };
@@ -731,12 +730,21 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
  public:
   LegalizeTF() = default;
 
+  void getDependentDialects(DialectRegistry& registry) const override {
+    registry.insert<MhloDialect>();
+  }
+
   explicit LegalizeTF(llvm::StringRef device_type, bool prefer_tf2xla) {
     device_type_ = device_type.str();
     prefer_tf2xla_ = prefer_tf2xla;
   }
 
   LegalizeTF(const LegalizeTF&) {}
+
+  StringRef getArgument() const final { return "xla-legalize-tf-with-tf2xla"; }
+  StringRef getDescription() const final {
+    return "Legalize from TensorFlow to the HLO dialect using tf2xla kernels";
+  }
 
   void runOnFunction() override {
     OwningRewritePatternList patterns(&getContext());
@@ -767,9 +775,7 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
   };
 };
 
-static PassRegistration<LegalizeTF> pass(
-    "xla-legalize-tf-with-tf2xla",
-    "Legalize from TensorFlow to the HLO dialect using tf2xla kernels");
+static PassRegistration<LegalizeTF> pass;
 
 }  // end namespace
 
