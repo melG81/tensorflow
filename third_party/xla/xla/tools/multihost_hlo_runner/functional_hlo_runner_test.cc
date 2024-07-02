@@ -22,15 +22,14 @@ limitations under the License.
 #include <gtest/gtest.h>
 #include "absl/log/check.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
 #include "absl/time/time.h"
 #include "xla/debug_options_flags.h"
-#include "xla/pjrt/distributed/key_value_store_interface.h"
-#include "xla/pjrt/distributed/service.h"
 #include "xla/pjrt/pjrt_client.h"
-#include "xla/statusor.h"
 #include "xla/tests/filecheck.h"
+#include "xla/tools/multihost_hlo_runner/create_client.h"
 #include "xla/tsl/util/command_line_flags.h"
 #include "tsl/lib/core/status_test_util.h"
 #include "tsl/platform/env.h"
@@ -60,9 +59,9 @@ std::string GetHloPath(std::string file_name) {
 
 absl::StatusOr<std::unique_ptr<xla::PjRtClient>> GetPjRtClient() {
   if (IsTestingCpu()) {
-    return xla::FunctionalHloRunner::CreateHostClient();
+    return CreateHostClient();
   }
-  return xla::FunctionalHloRunner::CreateGpuClient({});
+  return CreateGpuClient({});
 }
 
 using FunctionalHloRunnerTest = ::testing::Test;
@@ -317,6 +316,33 @@ absl::Status ShardedAutotuningWorksTestBody(const int node_id) {
     CHECK(!absl::StrContains(results2, "run_time"));
   }
   return absl::OkStatus();
+}
+
+TEST_F(FunctionalHloRunnerTest, CanRunWithMockCollectives) {
+  // This test corresponds to:
+  // --use_spmd_partitioning=true --num_replicas=1 --num_partitions=16
+  if (IsTestingCpu()) {
+    GTEST_SKIP() << "GPU-only test";
+  }
+  xla::DebugOptions debug_options;
+  FunctionalHloRunner::PreprocessingOptions preproc_options;
+  FunctionalHloRunner::RawCompileOptions raw_compile_options;
+  raw_compile_options.spmd_mode =
+      FunctionalHloRunner::SpmdMode::kUseSpmdPartitioning;
+  raw_compile_options.num_replicas = 1;
+  raw_compile_options.num_partitions = 16;
+
+  FunctionalHloRunner::RunningOptions running_options;
+  running_options.module_argument_mode =
+      FunctionalHloRunner::ModuleArgumentMode::kUseZerosAsInput;
+
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<xla::PjRtClient> client,
+                          CreateMockGpuClient(16));
+
+  TF_EXPECT_OK(FunctionalHloRunner::LoadAndRunAndDump(
+      *client, debug_options, preproc_options, raw_compile_options,
+      running_options, {GetHloPath("sharded_16_devices.hlo")},
+      InputFormat::kText));
 }
 
 }  // namespace
