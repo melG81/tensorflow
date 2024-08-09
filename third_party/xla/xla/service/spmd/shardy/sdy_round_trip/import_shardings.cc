@@ -21,29 +21,29 @@ limitations under the License.
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
-#include "mlir/AsmParser/AsmParser.h"  // from @llvm-project
-#include "mlir/Dialect/Func/IR/FuncOps.h"  // from @llvm-project
-#include "mlir/IR/Attributes.h"  // from @llvm-project
-#include "mlir/IR/Builders.h"  // from @llvm-project
-#include "mlir/IR/BuiltinAttributes.h"  // from @llvm-project
-#include "mlir/IR/BuiltinOps.h"  // from @llvm-project
-#include "mlir/IR/BuiltinTypes.h"  // from @llvm-project
-#include "mlir/IR/Diagnostics.h"  // from @llvm-project
-#include "mlir/IR/MLIRContext.h"  // from @llvm-project
-#include "mlir/IR/Operation.h"  // from @llvm-project
-#include "mlir/IR/SymbolTable.h"  // from @llvm-project
-#include "mlir/IR/Value.h"  // from @llvm-project
-#include "mlir/IR/Visitors.h"  // from @llvm-project
-#include "mlir/Parser/Parser.h"  // from @llvm-project
-#include "mlir/Pass/Pass.h"  // from @llvm-project
-#include "mlir/Pass/PassManager.h"  // from @llvm-project
-#include "mlir/Pass/PassRegistry.h"  // from @llvm-project
-#include "mlir/Support/LLVM.h"  // from @llvm-project
-#include "mlir/Support/TypeID.h"  // from @llvm-project
-#include "mlir/Transforms/DialectConversion.h"  // from @llvm-project
-#include "shardy/dialect/sdy/ir/constants.h"  // from @shardy
-#include "shardy/dialect/sdy/ir/dialect.h"  // from @shardy
-#include "shardy/dialect/sdy/ir/utils.h"  // from @shardy
+#include "mlir/AsmParser/AsmParser.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/Visitors.h"
+#include "mlir/Parser/Parser.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassRegistry.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/TypeID.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "shardy/dialect/sdy/ir/constants.h"
+#include "shardy/dialect/sdy/ir/dialect.h"
+#include "shardy/dialect/sdy/ir/utils.h"
 #include "xla/mlir_hlo/mhlo/IR/hlo_ops.h"
 #include "xla/mlir_hlo/mhlo/transforms/passes.h"
 #include "xla/service/spmd/shardy/constants.h"
@@ -96,6 +96,7 @@ void convertShardings(FuncOp funcOp) {
   // We need to wait until after we've converted all the Operations before
   // copying the result shardings.
   for (auto [argNum, argType] : llvm::enumerate(funcOp.getArgumentTypes())) {
+    funcOp.removeArgAttr(argNum, kXlaShardingAttr);
     // Attempt to extract the TensorShardingAttr from the frontend attributes of
     // the function argument/result.
     if (DictionaryAttr dictAttr = getFuncArgFrontendAttrs(funcOp, argNum)) {
@@ -106,8 +107,16 @@ void convertShardings(FuncOp funcOp) {
     }
   }
 
+  // Due to `SdyRoundTripExportShardingsPass` keeping `mhlo.sharding`s, remove
+  // them purely for cleanliness of the module.
+  for (int64_t resNum = 0; resNum < funcOp.getNumResults(); ++resNum) {
+    funcOp.removeResultAttr(
+        resNum, StringAttr::get(funcOp.getContext(), kXlaShardingAttr));
+  }
+
   // Extract the round-tripped SDY shardings from the operations.
   funcOp.front().walk([&](Operation* op) {
+    op->removeAttr(kXlaShardingAttr);
     if (DictionaryAttr dictAttr = getFrontendAttrs(op)) {
       // NOTE: we are only setting the sharding on known custom-calls. For any
       // other op that has a `kShardingRoundTripAttr` we discard it. XLA
