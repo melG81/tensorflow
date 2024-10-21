@@ -17,6 +17,23 @@ package(
 )
 
 cc_library(
+    name = "dot_algorithm_rewriter",
+    srcs = ["dot_algorithm_rewriter.cc"],
+    hdrs = ["dot_algorithm_rewriter.h"],
+    deps = [
+        "//xla:literal_util",
+        "//xla:shape_util",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/pass:hlo_pass",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:string_view",
+        "@local_tsl//tsl/platform:status",
+    ],
+)
+
+cc_library(
     name = "algebraic_simplifier",
     srcs = [
         "algebraic_simplifier.cc",
@@ -30,6 +47,7 @@ cc_library(
         "//xla:xla_data_proto_cc",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass",
+        "//xla/hlo/transforms:algebraic_simplifier",
         "//xla/service:algebraic_simplifier",
         "//xla/service:pattern_matcher",
         "//xla/service/gpu:matmul_utils",
@@ -51,6 +69,7 @@ xla_cc_test(
     deps = [
         ":algebraic_simplifier",
         "//xla/hlo/ir:hlo",
+        "//xla/hlo/transforms:algebraic_simplifier",
         "//xla/service:algebraic_simplifier",
         "//xla/service:pattern_matcher",
         "//xla/service:pattern_matcher_gmock",
@@ -517,11 +536,11 @@ cc_library(
     hdrs = ["collective_permute_valid_iteration_annotator.h"],
     deps = [
         "//xla:literal_util",
+        "//xla/hlo/analysis:while_loop_analysis",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass",
         "//xla/service:collective_ops_utils",
         "//xla/service:pattern_matcher",
-        "//xla/service:while_loop_analysis",
     ],
 )
 
@@ -699,6 +718,7 @@ cc_library(
     hdrs = ["convert_async_collectives_to_sync.h"],
     deps = [
         "//xla/hlo/ir:hlo",
+        "//xla/hlo/transforms:convert_async_collectives_to_sync",
         "//xla/service:convert_async_collectives_to_sync",
         "//xla/service/gpu:backend_configs_cc",
         "@com_google_absl//absl/container:flat_hash_map",
@@ -1398,6 +1418,7 @@ cc_library(
         "//xla:shape_util",
         "//xla:util",
         "//xla/hlo/ir:hlo",
+        "//xla/hlo/transforms:op_expander_pass",
         "//xla/service:op_expander_pass",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings:string_view",
@@ -1479,6 +1500,7 @@ cc_library(
         "//xla/hlo/ir:hlo_instruction_utils",
         "//xla/hlo/parser:hlo_parser",
         "//xla/hlo/pass:hlo_pass",
+        "//xla/hlo/transforms:flatten_call_graph",
         "//xla/hlo/utils:hlo_query",
         "//xla/service:collective_ops_utils",
         "//xla/service:flatten_call_graph",
@@ -1955,6 +1977,7 @@ cc_library(
         "//xla:xla_data_proto_cc",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass",
+        "//xla/hlo/transforms:sub_byte_normalization",
         "//xla/service:hlo_creation_utils",
         "//xla/service:sub_byte_normalization",
         "//xla/service/gpu:gpu_fusible",
@@ -2149,8 +2172,8 @@ cc_library(
     deps = [
         "//xla:debug_options_flags",
         "//xla:shape_util",
+        "//xla/hlo/analysis:hlo_dfs_reachability",
         "//xla/hlo/ir:hlo",
-        "//xla/hlo/ir:hlo_dfs_reachability",
         "//xla/hlo/pass:hlo_pass",
         "//xla/service:hlo_cost_analysis",
         "//xla/service:hlo_graph_dumper",
@@ -2823,6 +2846,7 @@ cc_library(
         "//xla:xla_data_proto_cc",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass",
+        "//xla/hlo/transforms:stable_sort_expander",
         "//xla/service:stable_sort_expander",
         "//xla/service/gpu:cublas_cudnn",
         "//xla/service/gpu/runtime:cub_sort_thunk",
