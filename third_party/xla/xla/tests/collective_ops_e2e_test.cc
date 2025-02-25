@@ -229,6 +229,28 @@ class AsyncMemcpyCollectiveOps
                                    std::get<1>(GetParam())) {}
 };
 
+std::string GetAsyncTestName(bool is_async) {
+  return is_async ? "async" : "sync";
+}
+
+std::string GetMemcpyTestName(bool is_memcpy) {
+  return is_memcpy ? "memcpy" : "nccl";
+}
+
+std::string GetAsyncTestSuiteName(const ::testing::TestParamInfo<bool>& info) {
+  return GetAsyncTestName(info.param);
+}
+
+std::string GetMemcpyTestSuiteName(const ::testing::TestParamInfo<bool>& info) {
+  return GetMemcpyTestName(info.param);
+}
+
+std::string GetAsyncMemcpyTestSuiteName(
+    const ::testing::TestParamInfo<std::tuple<bool, bool>>& info) {
+  return absl::StrCat(GetAsyncTestName(std::get<0>(info.param)), "_",
+                      GetMemcpyTestName(std::get<1>(info.param)));
+}
+
 XLA_TEST_P(AsyncCollectiveOps, AsyncAllReduce) {
   const absl::string_view kModuleStr = R"(
       HloModule test
@@ -848,14 +870,15 @@ TEST_P(AsyncCollectiveOps, MatmulReplicated) {
 }
 
 INSTANTIATE_TEST_SUITE_P(AsyncCollectiveOps, AsyncCollectiveOps,
-                         ::testing::Bool());
+                         ::testing::Bool(), GetAsyncTestSuiteName);
 
 INSTANTIATE_TEST_SUITE_P(MemcpyCollectiveOps, MemcpyCollectiveOps,
-                         ::testing::Bool());
+                         ::testing::Bool(), GetMemcpyTestSuiteName);
 
 INSTANTIATE_TEST_SUITE_P(AsyncMemcpyCollectiveOps, AsyncMemcpyCollectiveOps,
                          ::testing::Combine(::testing::Bool(),
-                                            ::testing::Bool()));
+                                            ::testing::Bool()),
+                         GetAsyncMemcpyTestSuiteName);
 
 // Tests for HLO level transforms.
 TEST_F(CollectiveOpsTestE2E, WhileLoopReduceScatterCodeMotion) {
@@ -1901,6 +1924,13 @@ class RaggedAllToAllTest : public AsyncMemcpyCollectiveOps {
         ragged_all_to_all->shape().dimensions().begin(),
         ragged_all_to_all->shape().dimensions().end()};
 
+    // The ragged-all-to-all accepts an output tensor as a parameter to allow
+    // buffer reuse. We initialize the output tensor with -1 to make sure that
+    // we don't accidentally overwrite data that is not part of the
+    // ragged-all-to-all update.
+    Array<float> output_init_data(ragged_tensor_sizes);
+    output_init_data.Fill(-1);
+
     Array<IndexType> output_sizes = input_sizes;
     output_sizes.TransposeDimensions({1, 0, 2});
 
@@ -1911,8 +1941,7 @@ class RaggedAllToAllTest : public AsyncMemcpyCollectiveOps {
     int64_t num_replicas = input_sizes.dim(0);
     std::vector<Array<float>> input_data(num_replicas,
                                          Array<float>(ragged_tensor_sizes));
-    std::vector<Array<float>> output_data(num_replicas,
-                                          Array<float>(ragged_tensor_sizes));
+    std::vector<Array<float>> output_data(num_replicas, output_init_data);
     FillWithRandomData(input_data, output_data, input_offsets, output_offsets,
                        input_sizes);
 
@@ -1932,9 +1961,7 @@ class RaggedAllToAllTest : public AsyncMemcpyCollectiveOps {
           GetReplicaSlice(replica_id, output_sizes)));
     }
 
-    // The ragged-all-to-all accepts an output tensor as a parameter to allow
-    // buffer reuse. We initialize the output tensor with zeros.
-    output_init_ = LiteralUtil::CreateFull(ragged_tensor_sizes, 0);
+    output_init_ = LiteralUtil::CreateFromArray(output_init_data);
   }
 
   // Returns a vector of pointers to the literals in the format needed for
@@ -2280,7 +2307,8 @@ XLA_TEST_P(RaggedAllToAllTest, RaggedAllToAll_8GPUs) {
 
 INSTANTIATE_TEST_SUITE_P(RaggedAllToAllTest, RaggedAllToAllTest,
                          ::testing::Combine(::testing::Bool(),
-                                            ::testing::Bool()));
+                                            ::testing::Bool()),
+                         GetAsyncMemcpyTestSuiteName);
 
 TEST_F(CollectiveOpsTestE2E, MemcpyP2pWhileLoopCorrectness) {
   absl::string_view hlo_string = R"(

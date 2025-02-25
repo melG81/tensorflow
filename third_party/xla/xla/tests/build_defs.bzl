@@ -1,4 +1,4 @@
-"""Build rules for XLA testing."""
+"""Build rules for XLA testing. This file is only used for the OSS build."""
 
 load("//xla:xla.bzl", "xla_cc_test")
 load("//xla/tests:plugin.bzl", "plugins")
@@ -191,7 +191,11 @@ def xla_test(
         backend_tags = {},
         backend_args = {},
         backend_kwargs = {},
+        # Inside Google, we link statically to catch duplicate main() definitions.
+        # However, this increases the size of the test binary, which breaks Nvidia's build.
+        # Therefore we use dynamic linking outside Google.
         linkstatic = False,
+        shuffle_tests = True,
         **kwargs):
     """Generates cc_test targets for the given XLA backends.
 
@@ -262,6 +266,7 @@ def xla_test(
         arguments to pass to native.cc_test. Only use for kwargs that don't have a
         dedicated argument, like setting per-backend flaky or timeout attributes.
       linkstatic: Whether to link the test statically.
+      shuffle_tests: Whether to shuffle the test cases.
       **kwargs: Additional keyword arguments to pass to native.cc_test.
     """
 
@@ -342,6 +347,7 @@ def xla_test(
             deps = deps + backend_deps,
             data = data + this_backend_data,
             linkstatic = linkstatic,
+            shuffle_tests = shuffle_tests,
             **this_backend_kwargs
         )
 
