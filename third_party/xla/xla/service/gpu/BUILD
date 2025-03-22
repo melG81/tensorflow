@@ -8,7 +8,7 @@ load(
     "if_rocm_is_configured",
     "rocm_copts",
 )
-load("//xla:xla.bzl", "xla_cc_test", "xla_internal")
+load("//xla:xla.default.bzl", "xla_cc_test", "xla_internal")
 load(
     "//xla/service/gpu:build_defs.bzl",
     "build_cub_sort_kernels",
@@ -1506,6 +1506,7 @@ cc_library(
         "//xla/service/gpu/transforms/collectives:gpu_all_reduce_combiner",
         "//xla/service/gpu/transforms/collectives:gpu_collective_combiner_utils",
         "//xla/service/gpu/transforms/collectives:gpu_reduce_scatter_combiner",
+        "//xla/service/gpu/transforms:add_tracking_suffix_to_instruction_names",
         "//xla/service/gpu/transforms:algebraic_simplifier",
         "//xla/service/gpu/transforms:algorithm_checker",
         "//xla/service/gpu/transforms:all_gather_dynamic_slice_simplifier",
